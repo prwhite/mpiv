@@ -3220,10 +3220,9 @@ async function setup({rule} = {}) {
 
   function collectRules() {
     return [...UI._rules.children]
-      .map(el => [el.value.trim(), el[RULE]])
-      .sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)
-      .map(([s, json]) => json || s)
-      .filter(Boolean);
+      .map(el => el.value.trim())
+      .filter(Boolean)
+      .sort();
   }
 
   function checkRule({target: el}) {
