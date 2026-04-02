@@ -1710,6 +1710,34 @@ const Ruler = {
       }); break;
 
       case 'reddit': rules.push({
+        e: 'gallery-carousel:has(li[slot="page-2"]) img.media-lightbox-img',
+        s: 'gallery',
+        async g(text, doc, url, m, rule, node) {
+          const carousel = node.closest('gallery-carousel');
+          if (!carousel) return [];
+          const permalink = carousel.getAttribute('permalink');
+          if (!permalink) return [];
+          const resp = await Req.gmXhr(`https://www.reddit.com${permalink}.json`);
+          const json = tryJSON(resp.responseText);
+          const post = ((json || [])[0] || {}).data;
+          const postData = ((post || {}).children || [])[0] || {};
+          let d = postData.data || {};
+          if (!d.gallery_data && d.crosspost_parent_list)
+            d = d.crosspost_parent_list[0] || d;
+          const gallery = (d.gallery_data || {}).items;
+          const meta = d.media_metadata;
+          if (!gallery || !meta) return [];
+          const items = gallery.map(item => {
+            const src = (meta[item.media_id] || {}).s;
+            if (!src) return null;
+            const u = (src.u || src.gif || '').replace(/&amp;/g, '&');
+            return u ? {url: u, desc: item.caption || ''} : null;
+          }).filter(Boolean);
+          const imgs = [...carousel.querySelectorAll('img.media-lightbox-img')];
+          items.index = Math.max(0, imgs.indexOf(node));
+          return items;
+        },
+      }, {
         u: '||i.reddituploads.com/',
       }, {
         e: '[data-url*="i.redd.it"] img[src*="thumb"]',
