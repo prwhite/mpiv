@@ -939,6 +939,7 @@ const Events = {
     } else if (cfg.zoom === 'wheel' && dir > 0 && ai.popup) {
       App.toggleZoom();
     } else if (App.canClose()) {
+      dropEvent(e);
       App.deactivate();
       return;
     }
@@ -973,12 +974,14 @@ const Events = {
         break;
       case 'ArrowRight':
       case 'KeyJ':
-        Gallery.next(1);
-        break;
+        if (ai.gNum > 1) { Gallery.next(1); break; }
+        App.deactivate({wait: true});
+        return;
       case 'ArrowLeft':
       case 'KeyK':
-        Gallery.next(-1);
-        break;
+        if (ai.gNum > 1) { Gallery.next(-1); break; }
+        App.deactivate({wait: true});
+        return;
       case 'KeyC':
         if (ai.bar.firstChild) {
           Bar.setText('');
@@ -1186,6 +1189,7 @@ const Gallery = {
   },
 
   next(dir) {
+    if (!ai.gItems) return;
     if (dir) ai.gIndex = Gallery.nextIndex(dir);
     const item = ai.gItem = ai.gItems[ai.gIndex];
     if (isArray(item.url)) {
