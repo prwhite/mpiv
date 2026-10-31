@@ -26,7 +26,7 @@
 // @grant       GM.setValue
 // @grant       GM.xmlHttpRequest
 //
-// @version     1.4.13
+// @version     1.4.14
 // @author      tophf
 //
 // @original-version 2017.9.29
@@ -1715,10 +1715,32 @@ const Ruler = {
         async g(text, doc, url, m, rule, node) {
           const carousel = node.closest('gallery-carousel');
           if (!carousel) return [];
-          const permalink = carousel.getAttribute('permalink');
+          const pages = [...carousel.querySelectorAll('li[slot^="page-"]')];
+          const index = Math.max(0, pages.indexOf(node.closest('li')));
+          // The carousel now carries each page's full-size i.redd.it URL in its hidden
+          // lightbox <img>, and the .json API answers logged-out/bot-flagged requests
+          // with a 403 HTML page, so read the DOM first and only fetch when a page is
+          // missing its image (not rendered yet).
+          const domItems = pages.map(li => {
+            const full = li.querySelector('.lightboxed-content img[src]');
+            if (full) return {url: full.src};
+            const preview = li.querySelector('img.media-lightbox-img[src]');
+            const pm = preview && preview.src.match(/\/\/preview\.redd\.it\/(?:[^/?]*-v0-)?(\w+\.\w+)/);
+            return pm ? {url: `https://i.redd.it/${pm[1]}`} : null;
+          });
+          if (domItems.every(Boolean)) {
+            domItems.index = index;
+            return domItems;
+          }
+          const items = await rule._fetchGallery(carousel.getAttribute('permalink'));
+          if (!items.length) return domItems.filter(Boolean);
+          items.index = index;
+          return items;
+        },
+        async _fetchGallery(permalink) {
           if (!permalink) return [];
-          const resp = await Req.gmXhr(`https://www.reddit.com${permalink}.json`);
-          const json = tryJSON(resp.responseText);
+          const resp = await Req.gmXhr(`https://www.reddit.com${permalink}.json`).catch(() => null);
+          const json = resp && tryJSON(resp.responseText);
           const post = ((json || [])[0] || {}).data;
           const postData = ((post || {}).children || [])[0] || {};
           let d = postData.data || {};
@@ -1727,15 +1749,12 @@ const Ruler = {
           const gallery = (d.gallery_data || {}).items;
           const meta = d.media_metadata;
           if (!gallery || !meta) return [];
-          const items = gallery.map(item => {
+          return gallery.map(item => {
             const src = (meta[item.media_id] || {}).s;
             if (!src) return null;
             const u = (src.u || src.gif || '').replace(/&amp;/g, '&');
             return u ? {url: u, desc: item.caption || ''} : null;
           }).filter(Boolean);
-          const imgs = [...carousel.querySelectorAll('img.media-lightbox-img')];
-          items.index = Math.max(0, imgs.indexOf(node));
-          return items;
         },
       }, {
         u: '||i.reddituploads.com/',
